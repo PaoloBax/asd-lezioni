@@ -1117,7 +1117,7 @@ function GestioneAnagrafica({ data, reload, tipo }) {
         ))}
         {error && <div className="sm:col-span-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>}
         <button onClick={handleAdd} disabled={saving} className="sm:col-span-2 bg-emerald-600 text-white py-2 rounded-lg font-medium disabled:opacity-50">
-          {saving ? 'Salvo...' : `Aggiungi ${config.titolo.slice(0, -1)}`}
+        {saving ? 'Salvo...' : `Aggiungi ${config.titolo.slice(0, -1)}`}
         </button>
       </div>
       <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
