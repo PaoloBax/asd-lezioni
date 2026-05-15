@@ -83,7 +83,7 @@ function Login() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-3">A</div>
+          <img src="/logo.png" alt="Ideabili" className="w-14 h-14 rounded-2xl object-contain mx-auto mb-3" />
           <h1 className="text-2xl font-bold text-slate-800">Ideabili - Gestione Corsi</h1>
           <p className="text-slate-500 text-sm">Accedi al tuo account</p>
         </div>
@@ -157,7 +157,7 @@ function AppLogged({ session, profilo }) {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">A</div>
+            <img src="/logo.png" alt="Ideabili" className="w-9 h-9 rounded-lg object-contain" />
             <div>
               <h1 className="font-bold text-slate-800">Ideabili - Gestione Corsi</h1>
               <p className="text-xs text-slate-500">{currentUser.nome} {currentUser.cognome} · {isAdmin ? 'Admin' : 'Istruttore'}</p>
