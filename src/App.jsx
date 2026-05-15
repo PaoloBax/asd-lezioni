@@ -159,7 +159,7 @@ function AppLogged({ session, profilo }) {
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">A</div>
             <div>
-              <h1 className="font-bold text-slate-800">ASD Lezioni</h1>
+              <h1 className="font-bold text-slate-800">Ideabili - Gestione Corsi</h1>
               <p className="text-xs text-slate-500">{currentUser.nome} {currentUser.cognome} · {isAdmin ? 'Admin' : 'Istruttore'}</p>
             </div>
           </div>
