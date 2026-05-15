@@ -84,7 +84,7 @@ function Login() {
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-6">
           <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-3">A</div>
-          <h1 className="text-2xl font-bold text-slate-800">ASD Lezioni</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Ideabili - Gestione Corsi</h1>
           <p className="text-slate-500 text-sm">Accedi al tuo account</p>
         </div>
         <div className="space-y-3">
