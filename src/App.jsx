@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import {
   Users, BookOpen, FileText, Calendar, LogOut, Plus, Check, AlertTriangle,
   Trash2, ChevronRight, User, Settings, BarChart3, X, Building2,
-  Infinity as InfinityIcon, Download, Printer, Loader2,
+  Infinity as InfinityIcon, Download, Printer, Loader2, Pencil,
 } from 'lucide-react';
 
 const formatDate = (d) => {
@@ -198,6 +198,29 @@ function NavBtn({ active, onClick, icon, children }) {
         active ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-600 hover:text-slate-900'}`}>
       {icon}{children}
     </button>
+  );
+}
+
+// ============ MODAL POPUP RIUTILIZZABILE ============
+function Modal({ title, onClose, children, maxWidth = 'max-w-lg' }) {
+  useEffect(() => {
+    const onEsc = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onEsc);
+    return () => document.removeEventListener('keydown', onEsc);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} my-8`} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-800">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-4">{children}</div>
+      </div>
+    </div>
   );
 }
 
@@ -830,7 +853,7 @@ function ReportIstruttore({ data, currentUser }) {
     const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Report ${istrName} - ${meseLabel}</title>
 <style>*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:24px;color:#1e293b}h1{font-size:20px;margin:0 0 4px}.sub{color:#64748b;font-size:13px;margin-bottom:16px}.meta{display:flex;gap:24px;padding:12px;background:#f1f5f9;border-radius:8px;margin-bottom:16px;font-size:13px}.meta strong{display:block;font-size:18px;color:#1e293b}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f8fafc;font-weight:600}td.data{white-space:nowrap;width:120px}td.num{text-align:center;width:50px;font-weight:600}tr.weekend{background:#f8fafc}.firma{margin-top:32px;display:flex;justify-content:space-between;font-size:13px}.firma div{width:45%}.firma .line{border-top:1px solid #94a3b8;margin-top:32px;padding-top:4px;color:#64748b;font-size:11px}.legend{font-size:11px;color:#64748b;margin-top:8px}@media print{body{margin:12mm}.noprint{display:none}}.actions{margin-bottom:16px}.actions button{padding:6px 12px;margin-right:8px;cursor:pointer}</style></head>
 <body><div class="actions noprint"><button onclick="window.print()">🖨 Stampa / Salva PDF</button><button onclick="window.close()">Chiudi</button></div>
-<h1>Report mensile lezioni erogate</h1><div class="sub">ASD — Generato il ${new Date().toLocaleDateString('it-IT')}</div>
+<h1>Report mensile lezioni erogate</h1><div class="sub">Ideabili - Gestione Corsi — Generato il ${new Date().toLocaleDateString('it-IT')}</div>
 <div class="meta"><div><span style="color:#64748b">Istruttore</span><strong>${istrName}</strong></div><div><span style="color:#64748b">Periodo</span><strong>${meseLabel}</strong></div><div><span style="color:#64748b">Totale lezioni</span><strong>${lezioniMese.length}</strong></div><div><span style="color:#64748b">Allievi / Enti</span><strong>${lezioniAllievo} / ${lezioniEnte}</strong></div></div>
 <table><thead><tr><th>Giorno</th><th>Lezioni</th><th>Dettaglio (codici)</th></tr></thead><tbody>${rowsHtml}</tbody></table>
 <div class="legend">[A] = lezione ad Allievo · [E] = lezione ad Ente · <strong>CT-AAAA-NNNN</strong> = codice contratto · <strong>XXX</strong> = codice servizio<br><em>Documento pseudonimizzato ai sensi del GDPR (Reg. UE 2016/679 art. 4 n. 5). I codici contratto sono riconducibili agli intestatari solo tramite la chiave di mappatura conservata dal Titolare del trattamento.</em></div>
@@ -947,6 +970,7 @@ function GestioneContratti({ data, reload }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(null); // contratto in modifica
   const [form, setForm] = useState({
     tipo_intestatario: 'allievo', allievo_id: '', ente_id: '', servizio_id: '',
     istruttore_titolare_id: '', istruttore_sostituto_id: '',
@@ -1046,6 +1070,7 @@ function GestioneContratti({ data, reload }) {
               <th className="px-3 py-2 font-semibold text-slate-700">Istruttore</th>
               <th className="px-3 py-2 font-semibold text-slate-700">Lezioni</th>
               <th className="px-3 py-2 font-semibold text-slate-700">Stato</th>
+              <th className="px-3 py-2 font-semibold text-slate-700"></th>
             </tr>
           </thead>
           <tbody>
@@ -1067,13 +1092,123 @@ function GestioneContratti({ data, reload }) {
                   <td className="px-3 py-2">
                     <button onClick={() => toggleStato(c)} className={`text-xs px-2 py-1 rounded-full font-medium ${c.stato === 'aperto' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>{c.stato}</button>
                   </td>
+                  <td className="px-3 py-2">
+                    <button onClick={() => setEditing(c)} className="text-indigo-600 hover:text-indigo-800 p-1" title="Modifica">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {editing && <ModalEditContratto contratto={editing} data={data} reload={reload} onClose={() => setEditing(null)} />}
     </div>
+  );
+}
+
+// ============ MODAL MODIFICA CONTRATTO ============
+function ModalEditContratto({ contratto, data, reload, onClose }) {
+  const isEnte = contratto.tipo_intestatario === 'ente';
+  const [form, setForm] = useState({
+    lezioni_totali: contratto.lezioni_totali || '',
+    istruttore_titolare_id: contratto.istruttore_titolare_id || '',
+    istruttore_sostituto_id: contratto.istruttore_sostituto_id || '',
+    stato: contratto.stato,
+    note: contratto.note || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    setSaving(true); setError('');
+    const payload = {
+      istruttore_titolare_id: form.istruttore_titolare_id,
+      istruttore_sostituto_id: form.istruttore_sostituto_id || null,
+      stato: form.stato,
+      note: form.note || null,
+    };
+    if (!isEnte) payload.lezioni_totali = Number(form.lezioni_totali);
+
+    const { error } = await supabase.from('contratti').update(payload).eq('id', contratto.id);
+    setSaving(false);
+    if (error) { setError(error.message); return; }
+    await reload();
+    onClose();
+  };
+
+  // Dati immutabili da mostrare in sola lettura
+  const intestatarioNome = isEnte
+    ? data.enti.find(e => e.id === contratto.ente_id)?.ragione_sociale
+    : (() => { const a = data.allievi.find(x => x.id === contratto.allievo_id); return a ? `${a.nome} ${a.cognome}` : ''; })();
+  const servizioNome = data.servizi.find(s => s.id === contratto.servizio_id)?.nome;
+
+  return (
+    <Modal title={`Modifica contratto ${contratto.codice}`} onClose={onClose}>
+      <div className="space-y-3">
+        <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-1">
+          <div><span className="text-slate-500">Tipo:</span> <span className="font-medium">{isEnte ? 'Ente' : 'Allievo'}</span></div>
+          <div><span className="text-slate-500">Intestatario:</span> <span className="font-medium">{intestatarioNome}</span></div>
+          <div><span className="text-slate-500">Servizio:</span> <span className="font-medium">{servizioNome}</span></div>
+          <div><span className="text-slate-500">Data inizio:</span> <span className="font-medium">{formatDate(contratto.data_inizio)}</span></div>
+          <p className="text-xs text-slate-400 italic mt-2">Questi campi non sono modificabili</p>
+        </div>
+
+        {!isEnte && (
+          <div>
+            <label className="text-sm font-medium text-slate-700 mb-1 block">Numero totale lezioni</label>
+            <input type="number" min="1" value={form.lezioni_totali}
+              onChange={(e) => setForm({...form, lezioni_totali: e.target.value})}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        )}
+
+        <div>
+          <label className="text-sm font-medium text-slate-700 mb-1 block">Istruttore titolare</label>
+          <select value={form.istruttore_titolare_id} onChange={(e) => setForm({...form, istruttore_titolare_id: e.target.value})}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {data.istruttori.map(i => <option key={i.id} value={i.id}>{i.nome} {i.cognome}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-slate-700 mb-1 block">Istruttore sostituto (opzionale)</label>
+          <select value={form.istruttore_sostituto_id} onChange={(e) => setForm({...form, istruttore_sostituto_id: e.target.value})}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Nessun sostituto</option>
+            {data.istruttori.map(i => <option key={i.id} value={i.id}>{i.nome} {i.cognome}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-slate-700 mb-1 block">Stato</label>
+          <select value={form.stato} onChange={(e) => setForm({...form, stato: e.target.value})}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="aperto">Aperto</option>
+            <option value="sospeso">Sospeso</option>
+            <option value="chiuso">Chiuso</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-slate-700 mb-1 block">Note</label>
+          <textarea value={form.note} onChange={(e) => setForm({...form, note: e.target.value})}
+            rows="2"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>}
+
+        <div className="flex gap-2 pt-2">
+          <button onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium">Annulla</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium disabled:opacity-50">
+            {saving ? 'Salvo...' : 'Salva modifiche'}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -1085,10 +1220,13 @@ function GestioneAnagrafica({ data, reload, tipo }) {
     istruttori: { titolo: 'istruttori', tabella: 'istruttori', campi: ['nome', 'cognome'], displayLabel: i => `${i.nome} ${i.cognome}`, extra: { attivo: true } },
   }[tipo];
 
+  const singolare = { allievi: 'allievo', enti: 'ente', servizi: 'servizio', istruttori: 'istruttore' }[tipo];
+
   const items = data[tipo] || [];
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(null); // record in modifica
 
   const handleAdd = async () => {
     setSaving(true); setError('');
@@ -1117,23 +1255,113 @@ function GestioneAnagrafica({ data, reload, tipo }) {
         ))}
         {error && <div className="sm:col-span-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>}
         <button onClick={handleAdd} disabled={saving} className="sm:col-span-2 bg-emerald-600 text-white py-2 rounded-lg font-medium disabled:opacity-50">
-        {saving ? 'Salvo...' : `Aggiungi ${config.titolo.slice(0, -1)}`}
+          {saving ? 'Salvo...' : `Aggiungi ${singolare}`}
         </button>
       </div>
       <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
         {items.map(item => (
-          <div key={item.id} className="p-3">
-            <div className="font-medium text-slate-800 flex items-center gap-2">
-              {item.codice && <span className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{item.codice}</span>}
-              {tipo === 'enti' && <Building2 className="w-4 h-4 text-purple-600" />}
-              {config.displayLabel(item)}
+          <div key={item.id} className="p-3 flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-slate-800 flex items-center gap-2">
+                {item.codice && <span className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{item.codice}</span>}
+                {tipo === 'enti' && <Building2 className="w-4 h-4 text-purple-600" />}
+                <span className="truncate">{config.displayLabel(item)}</span>
+                {(tipo === 'servizi' || tipo === 'istruttori') && item.attivo === false && (
+                  <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">disattivato</span>
+                )}
+              </div>
+              <div className="text-xs text-slate-500 truncate">
+                {item.email && `${item.email} · `}{item.telefono}{item.descrizione}{item.referente && `${item.referente}`}
+              </div>
             </div>
-            <div className="text-xs text-slate-500">
-              {item.email && `${item.email} · `}{item.telefono}{item.descrizione}{item.referente && `${item.referente}`}
-            </div>
+            <button onClick={() => setEditing(item)} className="text-indigo-600 hover:text-indigo-800 p-1 flex-shrink-0" title="Modifica">
+              <Pencil className="w-4 h-4" />
+            </button>
           </div>
         ))}
       </div>
+
+      {editing && <ModalEditAnagrafica record={editing} tipo={tipo} config={config} reload={reload} onClose={() => setEditing(null)} />}
     </div>
+  );
+}
+
+// ============ MODAL MODIFICA ANAGRAFICA (allievi/enti/servizi/istruttori) ============
+function ModalEditAnagrafica({ record, tipo, config, reload, onClose }) {
+  const singolare = { allievi: 'allievo', enti: 'ente', servizi: 'servizio', istruttori: 'istruttore' }[tipo];
+  const [form, setForm] = useState(() => {
+    const f = {};
+    config.campi.forEach(c => { f[c] = record[c] || ''; });
+    if (tipo === 'servizi' || tipo === 'istruttori') f.attivo = record.attivo !== false;
+    return f;
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    setSaving(true); setError('');
+    const payload = {};
+    config.campi.forEach(c => { payload[c] = form[c] || null; });
+    if (tipo === 'servizi' || tipo === 'istruttori') payload.attivo = form.attivo;
+    const { error } = await supabase.from(config.tabella).update(payload).eq('id', record.id);
+    setSaving(false);
+    if (error) { setError(error.message); return; }
+    await reload();
+    onClose();
+  };
+
+  const labels = {
+    nome: 'Nome', cognome: 'Cognome', email: 'Email', telefono: 'Telefono', note: 'Note',
+    ragione_sociale: 'Ragione sociale', referente: 'Referente', descrizione: 'Descrizione',
+  };
+
+  const title = `Modifica ${singolare}${record.codice ? ' ' + record.codice : ''}`;
+
+  return (
+    <Modal title={title} onClose={onClose}>
+      <div className="space-y-3">
+        {record.codice && (
+          <div className="bg-slate-50 rounded-lg p-3 text-sm">
+            <span className="text-slate-500">Codice GDPR:</span>{' '}
+            <span className="font-mono font-medium">{record.codice}</span>
+            <p className="text-xs text-slate-400 italic mt-1">Il codice non è modificabile</p>
+          </div>
+        )}
+
+        {config.campi.map(c => (
+          <div key={c}>
+            <label className="text-sm font-medium text-slate-700 mb-1 block">{labels[c] || c}</label>
+            {c === 'note' || c === 'descrizione' ? (
+              <textarea value={form[c] || ''} onChange={(e) => setForm({...form, [c]: e.target.value})}
+                rows="2"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            ) : (
+              <input type={c === 'email' ? 'email' : 'text'} value={form[c] || ''} onChange={(e) => setForm({...form, [c]: e.target.value})}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            )}
+          </div>
+        ))}
+
+        {(tipo === 'servizi' || tipo === 'istruttori') && (
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input type="checkbox" checked={form.attivo} onChange={(e) => setForm({...form, attivo: e.target.checked})}
+                className="w-4 h-4" />
+              Attivo
+            </label>
+            <p className="text-xs text-slate-500 mt-1">Se disattivato, non comparirà più nei menu di selezione</p>
+          </div>
+        )}
+
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>}
+
+        <div className="flex gap-2 pt-2">
+          <button onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium">Annulla</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium disabled:opacity-50">
+            {saving ? 'Salvo...' : 'Salva modifiche'}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
