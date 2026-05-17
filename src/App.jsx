@@ -1217,7 +1217,7 @@ function GestioneAnagrafica({ data, reload, tipo }) {
     allievi: { titolo: 'allievi', tabella: 'allievi', campi: ['nome', 'cognome', 'email', 'telefono', 'note'], displayLabel: a => `${a.nome} ${a.cognome}` },
     enti: { titolo: 'enti', tabella: 'enti', campi: ['ragione_sociale', 'referente', 'email', 'telefono', 'note'], displayLabel: e => e.ragione_sociale },
     servizi: { titolo: 'servizi', tabella: 'servizi', campi: ['nome', 'descrizione'], displayLabel: s => s.nome, extra: { attivo: true } },
-    istruttori: { titolo: 'istruttori', tabella: 'istruttori', campi: ['nome', 'cognome'], displayLabel: i => `${i.nome} ${i.cognome}`, extra: { attivo: true } },
+    istruttori: { titolo: 'istruttori', tabella: 'istruttori', campi: ['nome', 'cognome', 'telefono'], displayLabel: i => `${i.nome} ${i.cognome}`, extra: { attivo: true } },
   }[tipo];
 
   const singolare = { allievi: 'allievo', enti: 'ente', servizi: 'servizio', istruttori: 'istruttore' }[tipo];
@@ -1320,11 +1320,19 @@ function ModalEditAnagrafica({ record, tipo, config, reload, onClose }) {
   return (
     <Modal title={title} onClose={onClose}>
       <div className="space-y-3">
-        {record.codice && (
+{record.codice && (
           <div className="bg-slate-50 rounded-lg p-3 text-sm">
             <span className="text-slate-500">Codice GDPR:</span>{' '}
             <span className="font-mono font-medium">{record.codice}</span>
             <p className="text-xs text-slate-400 italic mt-1">Il codice non è modificabile</p>
+          </div>
+        )}
+
+        {tipo === 'istruttori' && record.email && (
+          <div className="bg-slate-50 rounded-lg p-3 text-sm">
+            <span className="text-slate-500">Email:</span>{' '}
+            <span className="font-medium">{record.email}</span>
+            <p className="text-xs text-slate-400 italic mt-1">L'email è collegata al login e non è modificabile da qui</p>
           </div>
         )}
 
