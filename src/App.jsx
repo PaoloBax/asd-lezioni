@@ -486,11 +486,13 @@ function RegistraLezione({ data, reload, currentUser }) {
     c.stato === 'aperto' && (isAdmin || c.istruttore_titolare_id === myIstruttoreId || c.istruttore_sostituto_id === myIstruttoreId)
   ), [data.contratti, isAdmin, myIstruttoreId]);
 
-  const intestatariVisibili = useMemo(() => {
-    if (tipo === 'allievo') {
-      const ids = new Set(contrattiVisibili.filter(c => c.tipo_intestatario === 'allievo').map(c => c.allievo_id));
-      return data.allievi.filter(a => ids.has(a.id)).map(a => ({ id: a.id, label: `${a.nome} ${a.cognome}`, sub: a.email }));
-    }
+const intestatariVisibili = useMemo(() => {
+  if (tipo === 'allievo') {
+    const ids = new Set(contrattiVisibili.filter(c => c.tipo_intestatario === 'allievo').map(c => c.allievo_id));
+    return data.allievi
+      .filter(a => ids.has(a.id) && a.attivo !== false) // ← Aggiungi questo filtro
+      .map(a => ({ id: a.id, label: `${a.nome} ${a.cognome}`, sub: a.email }));
+  }
     if (tipo === 'ente') {
       const ids = new Set(contrattiVisibili.filter(c => c.tipo_intestatario === 'ente').map(c => c.ente_id));
       return data.enti.filter(e => ids.has(e.id)).map(e => ({ id: e.id, label: e.ragione_sociale, sub: e.referente }));
@@ -1248,11 +1250,13 @@ function GestioneContratti({ data, reload }) {
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {form.tipo_intestatario === 'allievo' ? (
-              <select value={form.allievo_id} onChange={(e) => setForm({...form, allievo_id: e.target.value})} className="px-3 py-2 border border-slate-300 rounded-lg">
-                <option value="">Allievo...</option>
-                {data.allievi.map(a => <option key={a.id} value={a.id}>{a.nome} {a.cognome}</option>)}
-              </select>
+{form.tipo_intestatario === 'allievo' ? (
+  <select value={form.allievo_id} onChange={(e) => setForm({...form, allievo_id: e.target.value})} className="px-3 py-2 border border-slate-300 rounded-lg">
+    <option value="">Allievo...</option>
+    {data.allievi
+      .filter(a => a.attivo !== false) // ← Aggiungi questo filtro
+      .map(a => <option key={a.id} value={a.id}>{a.nome} {a.cognome}</option>)}
+  </select>          
             ) : (
               <select value={form.ente_id} onChange={(e) => setForm({...form, ente_id: e.target.value})} className="px-3 py-2 border border-slate-300 rounded-lg">
                 <option value="">Ente...</option>
@@ -1528,6 +1532,14 @@ function GestioneAnagrafica({ data, reload, tipo }) {
       </div>
 
       {editing && <ModalEditAnagrafica record={editing} tipo={tipo} config={config} reload={reload} onClose={() => setEditing(null)} />}
+ {editing && tipo === 'allievi' && (
+  <ModalToggleAllievoAttivo 
+    allievo={editing} 
+    data={data}
+    reload={reload} 
+    onClose={() => setEditing(null)} 
+  />
+)}                     
     </div>
   );
 }
@@ -1613,6 +1625,136 @@ function ModalEditAnagrafica({ record, tipo, config, reload, onClose }) {
           <button onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium">Annulla</button>
           <button onClick={handleSave} disabled={saving} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium disabled:opacity-50">
             {saving ? 'Salvo...' : 'Salva modifiche'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+// ============ MODAL TOGGLE ALLIEVO ATTIVO/INATTIVO ============
+function ModalToggleAllievoAttivo({ allievo, data, reload, onClose }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Contratti aperti per questo allievo
+  const contrattiAperti = data.contratti.filter(
+    c => c.allievo_id === allievo.id && c.stato === 'aperto'
+  );
+
+  const handleToggle = async () => {
+    setLoading(true);
+    setError('');
+
+    // Se vogliamo disattivare e ci sono contratti aperti, mostra errore
+    if (allievo.attivo && contrattiAperti.length > 0) {
+      setError(`Non puoi disattivare. Ci sono ${contrattiAperti.length} contratto/i aperto/i. Chiudili prima.`);
+      setLoading(false);
+      return;
+    }
+
+    // Aggiorna il campo attivo
+    const { error: updateError } = await supabase
+      .from('allievi')
+      .update({ attivo: !allievo.attivo })
+      .eq('id', allievo.id);
+
+    setLoading(false);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    await reload();
+    onClose();
+  };
+
+  const vuolDisattivare = allievo.attivo;
+  const haContratti = contrattiAperti.length > 0;
+
+  return (
+    <Modal 
+      title={vuolDisattivare ? 'Disattiva allievo' : 'Attiva allievo'} 
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        <div className="bg-slate-50 rounded-lg p-4">
+          <p className="text-sm text-slate-700">
+            <strong>{allievo.nome} {allievo.cognome}</strong>
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            Codice: <span className="font-mono">{allievo.codice}</span>
+          </p>
+        </div>
+
+        {vuolDisattivare ? (
+          <>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-sm text-amber-800">
+                <strong>⚠️ Attenzione:</strong> Disattivando questo allievo:
+              </p>
+              <ul className="text-xs text-amber-700 mt-2 space-y-1 ml-4 list-disc">
+                <li>Non potrà essere assegnato a nuovi contratti</li>
+                <li>Non potranno essere erogate nuove lezioni</li>
+                <li>I contratti chiusi rimarranno visibili</li>
+              </ul>
+            </div>
+
+            {haContratti && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-800 font-medium mb-2">
+                  ❌ Non è possibile disattivare
+                </p>
+                <p className="text-xs text-red-700 mb-2">
+                  Questo allievo ha {contrattiAperti.length} contratto/i ancora aperto/i:
+                </p>
+                <div className="space-y-1">
+                  {contrattiAperti.map(c => {
+                    const servizio = data.servizi.find(s => s.id === c.servizio_id);
+                    return (
+                      <div key={c.id} className="text-xs bg-white p-2 rounded border border-red-100">
+                        <strong>{c.codice}</strong> · {servizio?.nome}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-red-700 mt-2">
+                  Chiudi questi contratti e riprova.
+                </p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+            <p className="text-sm text-emerald-800">
+              Attivando questo allievo sarà di nuovo possibile assegnare contratti e erogare lezioni.
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <button 
+            onClick={onClose} 
+            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium"
+          >
+            Annulla
+          </button>
+          <button 
+            onClick={handleToggle} 
+            disabled={loading || (vuolDisattivare && haContratti)}
+            className={`flex-1 py-2 rounded-lg font-medium text-white ${
+              vuolDisattivare
+                ? 'bg-red-600 hover:bg-red-700 disabled:bg-slate-300'
+                : 'bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300'
+            }`}
+          >
+            {loading ? 'Salvo...' : (vuolDisattivare ? 'Disattiva' : 'Attiva')}
           </button>
         </div>
       </div>
