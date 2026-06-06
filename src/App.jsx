@@ -1487,26 +1487,44 @@ function GestioneAnagrafica({ data, reload, tipo }) {
         </button>
       </div>
       <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-        {items.map(item => (
-          <div key={item.id} className="p-3 flex items-center justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-slate-800 flex items-center gap-2">
-                {item.codice && <span className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{item.codice}</span>}
-                {tipo === 'enti' && <Building2 className="w-4 h-4 text-purple-600" />}
-                <span className="truncate">{config.displayLabel(item)}</span>
-                {(tipo === 'servizi' || tipo === 'istruttori') && item.attivo === false && (
-                  <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">disattivato</span>
-                )}
-              </div>
-              <div className="text-xs text-slate-500 truncate">
-                {item.email && `${item.email} · `}{item.telefono}{item.descrizione}{item.referente && `${item.referente}`}
-              </div>
-            </div>
-            <button onClick={() => setEditing(item)} className="text-indigo-600 hover:text-indigo-800 p-1 flex-shrink-0" title="Modifica">
-              <Pencil className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
+  {items.map(item => (
+  <div key={item.id} className="p-3 flex items-center justify-between gap-2">
+    <div className="flex-1 min-w-0">
+      <div className="font-medium text-slate-800 flex items-center gap-2">
+        {item.codice && <span className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{item.codice}</span>}
+        {tipo === 'enti' && <Building2 className="w-4 h-4 text-purple-600" />}
+        <span className="truncate">{config.displayLabel(item)}</span>
+        {(tipo === 'servizi' || tipo === 'istruttori') && item.attivo === false && (
+          <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">disattivato</span>
+        )}
+        {tipo === 'allievi' && item.attivo === false && (
+          <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">inattivo</span>
+        )}
+      </div>
+      <div className="text-xs text-slate-500 truncate">
+        {item.email && `${item.email} · `}{item.telefono}{item.descrizione}{item.referente && `${item.referente}`}
+      </div>
+    </div>
+    <div className="flex items-center gap-1 flex-shrink-0">
+      {tipo === 'allievi' && (
+        <button 
+          onClick={() => setEditing(item)} 
+          className={`text-xs px-2 py-1 rounded font-medium ${
+            item.attivo 
+              ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+              : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+          }`}
+          title={item.attivo ? 'Disattiva allievo' : 'Attiva allievo'}
+        >
+          {item.attivo ? 'Disattiva' : 'Attiva'}
+        </button>
+      )}
+      <button onClick={() => setEditing(item)} className="text-indigo-600 hover:text-indigo-800 p-1" title="Modifica">
+        <Pencil className="w-4 h-4" />
+      </button>
+    </div>
+  </div>
+))}
       </div>
 
       {editing && <ModalEditAnagrafica record={editing} tipo={tipo} config={config} reload={reload} onClose={() => setEditing(null)} />}
