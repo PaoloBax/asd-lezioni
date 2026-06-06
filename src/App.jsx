@@ -23,6 +23,168 @@ const intestatarioLabel = (data, contratto) => {
   return a ? `${a.nome} ${a.cognome}` : '—';
 };
 
+// Hook per gestire edit/delete lezioni
+function useLezioniManager() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Valida se la lezione può essere modificata (non più vecchia di un mese)
+  const canEditLezione = (dataLezione) => {
+    const today = new Date();
+    const oneMonthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+    const lezioneDate = new Date(dataLezione);
+    return lezioneDate >= oneMonthAgo;
+  };
+
+  // Aggiorna la data della lezione (solo admin)
+  const updateLezioneData = async (lezioneId, nuovaData) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (!canEditLezione(nuovaData)) {
+        throw new Error('Non puoi modificare lezioni più vecchie di un mese');
+      }
+
+      const { error: updateError } = await supabase
+        .from('lezioni')
+        .update({ data: nuovaData })
+        .eq('id', lezioneId);
+
+      if (updateError) throw updateError;
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Errore aggiornamento lezione';
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Elimina la lezione (hard delete)
+  const deleteLezione = async (lezioneId) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('lezioni')
+        .delete()
+        .eq('id', lezioneId);
+
+      if (deleteError) throw deleteError;
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Errore eliminazione lezione';
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    updateLezioneData,
+    deleteLezione,
+    canEditLezione,
+    loading,
+    error,
+  };
+}
+
+// Modal per modificare la data della lezione
+function EditLezioneModal({ lezione, isOpen, onClose, onSave, canEdit, loading }) {
+  const [nuovaData, setNuovaData] = useState(
+    lezione?.data ? lezione.data : todayISO()
+  );
+  const [error, setError] = useState(null);
+
+  if (!isOpen || !lezione) return null;
+
+  const handleSave = async () => {
+    setError(null);
+
+    if (!canEdit(nuovaData)) {
+      setError('Non puoi modificare lezioni più vecchie di un mese');
+      return;
+    }
+
+    try {
+      await onSave(nuovaData);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore nel salvataggio');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <h3 className="text-lg font-bold text-slate-800">Modifica data lezione</h3>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-800"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="bg-slate-50 rounded-lg p-3 text-sm">
+            <p className="text-slate-600">
+              <strong>Data attuale:</strong> {lezione?.data ? formatDate(lezione.data) : '—'}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              <Calendar className="inline-block w-4 h-4 mr-2" />
+              Nuova data erogazione
+            </label>
+            <input
+              type="date"
+              value={nuovaData}
+              onChange={(e) => setNuovaData(e.target.value)}
+              disabled={loading}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              Puoi modificare solo lezioni registrate dal mese precedente
+            </p>
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              Salva
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [profilo, setProfilo] = useState(null);
@@ -54,6 +216,9 @@ export default function App() {
 
   return <AppLogged session={session} profilo={profilo} />;
 }
+
+
+
 
 function FullScreenLoader({ text }) {
   return (
@@ -735,36 +900,100 @@ function SchedaEnte({ data, reload, enteId, currentUser, onBack }) {
 }
 
 function ListaLezioni({ lezioni, data, currentUser, confermaElimina, setConfermaElimina, handleDelete }) {
+  const { updateLezioneData, canEditLezione, loading } = useLezioniManager();
+  const [editingLezione, setEditingLezione] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
   if (lezioni.length === 0) return null;
+
+  const handleEditSave = async (nuovaData) => {
+    if (!editingLezione) return;
+    const result = await updateLezioneData(editingLezione.id, nuovaData);
+    if (result.success) {
+      setShowEditModal(false);
+      setEditingLezione(null);
+      // Reload verrà fatto dal componente parent
+      window.location.reload(); // Temporaneo: ricarica la pagina
+    }
+  };
+
+  const isAdmin = currentUser.role === 'admin';
+
   return (
-    <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
-      <p className="text-xs font-semibold text-slate-700 mb-2">DATE DELLE LEZIONI</p>
-      <div className="space-y-1">
-        {lezioni.map(l => {
-          const istr = data.istruttori.find(i => i.id === l.istruttore_id);
-          const canDelete = currentUser.role === 'admin' || l.created_by === currentUser.id;
-          const isConfirming = confermaElimina === l.id;
-          return (
-            <div key={l.id} className="flex items-center justify-between text-sm py-1">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-slate-700">{formatDate(l.data)}</span>
-                <span className="text-xs text-slate-500">· {istr?.nome} {istr?.cognome}</span>
-                {l.note && <span className="text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">{l.note}</span>}
-              </div>
-              {canDelete && (isConfirming ? (
-                <div className="flex items-center gap-1">
-                  <button onClick={() => handleDelete(l.id)} className="text-xs bg-red-600 text-white px-2 py-0.5 rounded hover:bg-red-700">Elimina</button>
-                  <button onClick={() => setConfermaElimina(null)} className="text-xs bg-slate-200 px-2 py-0.5 rounded hover:bg-slate-300">Annulla</button>
+    <>
+      <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
+        <p className="text-xs font-semibold text-slate-700 mb-2">DATE DELLE LEZIONI</p>
+        <div className="space-y-1">
+          {lezioni.map(l => {
+            const istr = data.istruttori.find(i => i.id === l.istruttore_id);
+            const isConfirming = confermaElimina === l.id;
+            const canModify = canEditLezione(l.data);
+
+            return (
+              <div key={l.id} className="flex items-center justify-between text-sm py-2 px-2 hover:bg-white rounded transition">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                  <span className="text-slate-700">{formatDate(l.data)}</span>
+                  <span className="text-xs text-slate-500 whitespace-nowrap">· {istr?.nome} {istr?.cognome}</span>
+                  {l.note && <span className="text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded truncate">{l.note}</span>}
                 </div>
-              ) : (
-                <button onClick={() => setConfermaElimina(l.id)} className="text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
-              ))}
-            </div>
-          );
-        })}
+
+                {isAdmin && (isConfirming ? (
+                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                    <button 
+                      onClick={() => handleDelete(l.id)} 
+                      className="text-xs bg-red-600 text-white px-2 py-0.5 rounded hover:bg-red-700"
+                    >
+                      Elimina
+                    </button>
+                    <button 
+                      onClick={() => setConfermaElimina(null)} 
+                      className="text-xs bg-slate-200 px-2 py-0.5 rounded hover:bg-slate-300"
+                    >
+                      Annulla
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                    <button
+                      onClick={() => {
+                        setEditingLezione(l);
+                        setShowEditModal(true);
+                      }}
+                      disabled={!canModify}
+                      title={!canModify ? 'Non puoi modificare lezioni più vecchie di un mese' : 'Modifica data'}
+                      className="text-slate-400 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed p-0.5"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                      onClick={() => setConfermaElimina(l.id)} 
+                      className="text-slate-400 hover:text-red-600 p-0.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      {editingLezione && (
+        <EditLezioneModal
+          lezione={editingLezione}
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingLezione(null);
+          }}
+          onSave={handleEditSave}
+          canEdit={canEditLezione}
+          loading={loading}
+        />
+      )}
+    </>
   );
 }
 
