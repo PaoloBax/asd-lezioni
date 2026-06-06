@@ -827,7 +827,7 @@ function SchedaAllievo({ data, reload, allievoId, currentUser, onBack }) {
                   </div>
                 </div>
               </div>
-              <ListaLezioni lezioni={lezioniContratto} data={data} currentUser={currentUser} confermaElimina={confermaElimina} setConfermaElimina={setConfermaElimina} handleDelete={handleDeleteLezione} />
+              <ListaLezioni lezioni={lezioniContratto} data={data} currentUser={currentUser} confermaElimina={confermaElimina} setConfermaElimina={setConfermaElimina} handleDelete={handleDeleteLezione} reload={reload} />
             </div>
           );
         })}
@@ -890,7 +890,7 @@ function SchedaEnte({ data, reload, enteId, currentUser, onBack }) {
                   <span className="text-2xl font-bold text-purple-900">{erogate}</span>
                 </div>
               </div>
-              <ListaLezioni lezioni={lezioniContratto} data={data} currentUser={currentUser} confermaElimina={confermaElimina} setConfermaElimina={setConfermaElimina} handleDelete={handleDeleteLezione} />
+              <ListaLezioni lezioni={lezioniContratto} data={data} currentUser={currentUser} confermaElimina={confermaElimina} setConfermaElimina={setConfermaElimina} handleDelete={handleDeleteLezione} reload={reload}/>
             </div>
           );
         })}
@@ -899,23 +899,22 @@ function SchedaEnte({ data, reload, enteId, currentUser, onBack }) {
   );
 }
 
-function ListaLezioni({ lezioni, data, currentUser, confermaElimina, setConfermaElimina, handleDelete }) {
+function ListaLezioni({ lezioni, data, currentUser, confermaElimina, setConfermaElimina, handleDelete, reload }) {
   const { updateLezioneData, canEditLezione, loading } = useLezioniManager();
   const [editingLezione, setEditingLezione] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
   if (lezioni.length === 0) return null;
 
-  const handleEditSave = async (nuovaData) => {
-    if (!editingLezione) return;
-    const result = await updateLezioneData(editingLezione.id, nuovaData);
-    if (result.success) {
-      setShowEditModal(false);
-      setEditingLezione(null);
-      // Reload verrà fatto dal componente parent
-      window.location.reload(); // Temporaneo: ricarica la pagina
-    }
-  };
+const handleEditSave = async (nuovaData) => {
+  if (!editingLezione) return;
+  const result = await updateLezioneData(editingLezione.id, nuovaData);
+  if (result.success) {
+    setShowEditModal(false);
+    setEditingLezione(null);
+    if (reload) await reload(); // ✅ Nuovo
+  }
+};
 
   const isAdmin = currentUser.role === 'admin';
 
